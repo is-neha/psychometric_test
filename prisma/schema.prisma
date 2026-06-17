@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+}
+
+enum ReportStatus {
+  DRAFT
+  REVIEWED
+  PUBLISHED
+}
+
+model User {
+  id           String      @id @default(cuid())
+  username     String      @unique
+  passwordHash String
+  role         Role        @default(USER)
+  consentAt    DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  attempts     Attempt[]
+  reports      Report[]    @relation("ReportSubject")
+  reviewed     Report[]    @relation("ReportReviewer")
+  auditLogs    AuditLog[]
+}
+
+model Questionnaire {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  audience    String
+  version     Int       @default(1)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  sections    Section[]
+  attempts    Attempt[]
+
+  @@unique([title, version])
+}
+
+model Section {
+  id              String        @id @default(cuid())
+  title           String
+  description     String?
+  position        Int
+  questionnaireId String
+  questionnaire   Questionnaire @relation(fields: [questionnaireId], references: [id], onDelete: Cascade)
+  questions       Question[]
+}
+
+model Question {
+  id        String   @id @default(cuid())
+  text      String
+  position  Int
+  model     String
+  trait     String?
+  sectionId String
+  section   Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  options   Option[]
+  responses Response[]
+}
+
+model Option {
+  id          String   @id @default(cuid())
+  label       String
+  text        String
+  position    Int
+  scoringJson String
+  adminNote   String?
+  questionId  String
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  responses   Response[]
+}
+
+model Attempt {
+  id              String         @id @default(cuid())
+  status          AttemptStatus  @default(IN_PROGRESS)
+  startedAt       DateTime       @default(now())
+  submittedAt     DateTime?
+  scoresJson      String?
+  userId          String
+  questionnaireId String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionnaire   Questionnaire  @relation(fields: [questionnaireId], references: [id])
+  responses       Response[]
+  report          Report?
+}
+
+model Response {
+  id                 String   @id @default(cuid())
+  questionText       String
+  optionText         String
+  scoringSnapshot    String
+  attemptId          String
+  questionId         String
+  optionId           String
+  attempt            Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question           Question @relation(fields: [questionId], references: [id])
+  option             Option   @relation(fields: [optionId], references: [id])
+
+  @@unique([attemptId, questionId])
+}
+
+model Report {
+  id             String       @id @default(cuid())
+  status         ReportStatus @default(DRAFT)
+  aiDraft        String?
+  adminContent   String?
+  publishedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  attemptId      String       @unique
+  subjectId      String
+  reviewerId     String?
+  attempt        Attempt      @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  subject        User         @relation("ReportSubject", fields: [subjectId], references: [id], onDelete: Cascade)
+  reviewer       User?        @relation("ReportReviewer", fields: [reviewerId], references: [id])
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
