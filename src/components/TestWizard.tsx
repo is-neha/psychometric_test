@@ -81,7 +81,7 @@ export function TestWizard({ attemptId, questionnaire, initialResponses }: TestW
     }))
   );
 
-  const [currentIndex, setCurrentIndex] = useState(() => {
+  const [currentIndex, setCurrentIndex] = useState<number>(() => {
     // Start at the first unanswered question
     const firstUnanswered = questionsList.findIndex((q: any) => !initialResponses[q.id]);
     return firstUnanswered === -1 ? 0 : firstUnanswered;
